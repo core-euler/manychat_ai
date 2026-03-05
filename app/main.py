@@ -50,7 +50,14 @@ async def manychat_webhook(
 
 
 @app.post("/manychat-callback", response_model=WebhookAckResponse)
-async def manychat_callback(payload: ManyChatCallbackIn) -> WebhookAckResponse:
+async def manychat_callback(
+    payload: ManyChatCallbackIn,
+    x_internal_secret: str | None = Header(default=None),
+) -> WebhookAckResponse:
+    if settings.internal_api_secret:
+        if x_internal_secret != settings.internal_api_secret:
+            raise HTTPException(status_code=401, detail="Invalid internal secret")
+
     client = ManyChatClient(settings)
     await client.save_reply_and_handoff(payload.contact_id, payload.reply_text, payload.handoff)
     await client.send_flow(payload.contact_id)

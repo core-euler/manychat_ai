@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     manychat_field_handoff: str = Field(default="handoff_flag", alias="MANYCHAT_FIELD_HANDOFF")
 
     manychat_webhook_secret: str | None = Field(default=None, alias="MANYCHAT_WEBHOOK_SECRET")
+    internal_api_secret: str | None = Field(default=None, alias="INTERNAL_API_SECRET")
+
+    system_prompt_path: str = Field(default="system_prompt.txt", alias="SYSTEM_PROMPT_PATH")
 
 
 @lru_cache(maxsize=1)

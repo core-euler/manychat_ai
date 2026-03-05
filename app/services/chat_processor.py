@@ -11,6 +11,10 @@ from app.schemas import ManyChatWebhookIn
 
 logger = logging.getLogger(__name__)
 HANDOFF_TAG = "[HANDOFF]"
+HANDOFF_PROMPT_RULE = (
+    "If you need to hand off the user to a human admin for booking/scheduling/deposit, "
+    "uncertain answers, or non-standard requests, end your reply with [HANDOFF]."
+)
 
 
 def channel_limit(channel: str) -> int:
@@ -34,21 +38,29 @@ def parse_handoff(text: str) -> tuple[str, bool]:
     return cleaned, True
 
 
-def load_system_prompt(path: str = "system_prompt.txt") -> str:
+def load_system_prompt(path: str) -> str:
     prompt_path = Path(path)
     if not prompt_path.exists():
-        logger.warning("system_prompt.txt not found, using fallback")
-        return "You are a helpful AI sales assistant."
-    return prompt_path.read_text(encoding="utf-8").strip()
+        raise FileNotFoundError(f"System prompt file not found: {path}")
+
+    prompt = prompt_path.read_text(encoding="utf-8").strip()
+    if not prompt:
+        raise ValueError(f"System prompt file is empty: {path}")
+
+    if HANDOFF_TAG not in prompt:
+        prompt = f"{prompt}\n\n{HANDOFF_PROMPT_RULE}"
+
+    return prompt
 
 
 async def process_incoming_message(payload: ManyChatWebhookIn, settings: Settings) -> None:
     try:
+        history = get_recent_messages(settings.db_path, payload.contact_id, limit=30)
         add_message(settings.db_path, payload.contact_id, "user", payload.last_input)
 
-        history = get_recent_messages(settings.db_path, payload.contact_id, limit=30)
-        messages = [{"role": "system", "content": load_system_prompt()}]
+        messages = [{"role": "system", "content": load_system_prompt(settings.system_prompt_path)}]
         messages.extend(history)
+        messages.append({"role": "user", "content": payload.last_input})
 
         comet = CometClient(settings)
         llm_raw = await comet.complete(messages)

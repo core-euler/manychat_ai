@@ -1,10 +1,3 @@
-# ТЗ: AI-бот продажник для Tattoo 44
-**Версия:** 1.1  
-**Статус:** В разработке  
-**Исполнитель:** DevCore  
-
----
-
 ## 1. Обзор системы
 
 ### Цель
@@ -217,14 +210,14 @@ PORT=3000
 
 ## 5. Интеграция CometAPI
 
-**Документация CometAPI (локально):** `docs/API.md`  
-**Базовый URL:** `https://api.cometapi.com`  
-**Авторизация:** `Authorization: Bearer <COMET_API_KEY>`  
+**Документация CometAPI:** `[ВСТАВИТЬ ССЫЛКУ]`  
+**Базовый URL:** `[ВСТАВИТЬ]`  
+**Авторизация:** `[ВСТАВИТЬ — Bearer token / API key]`  
 
 ### 5.1 Формат запроса к LLM
 ```json
 {
-  "model": "gpt-5-chat-latest",
+  "model": "[ВСТАВИТЬ — название модели из CometAPI]",
   "max_tokens": 500,
   "messages": [
     { "role": "system", "content": "<SYSTEM_PROMPT>" },
