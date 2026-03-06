@@ -28,7 +28,7 @@ class ManyChatClient:
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
-                f"{self._base_url}/fb/subscriber/setCustomField",
+                f"{self._base_url}/fb/subscriber/setCustomFieldByName",
                 headers=self._headers,
                 json=payload,
             )
