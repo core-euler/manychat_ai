@@ -66,6 +66,17 @@ def init_db(db_path: str) -> None:
             ON followup_state(status, followup_scheduled_for)
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS handoff_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id TEXT NOT NULL,
+                dedupe_key TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                UNIQUE(contact_id, dedupe_key)
+            )
+            """
+        )
 
 
 def add_message(db_path: str, contact_id: str, role: str, content: str) -> None:
@@ -266,3 +277,15 @@ def get_followup_state(db_path: str, contact_id: str) -> dict[str, str] | None:
     if row is None:
         return None
     return dict(row)
+
+
+def register_handoff_notification(db_path: str, contact_id: str, dedupe_key: str) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            """
+            INSERT OR IGNORE INTO handoff_notifications(contact_id, dedupe_key, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (contact_id, dedupe_key, utcnow_iso()),
+        )
+        return cur.rowcount == 1

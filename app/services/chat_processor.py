@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
 from app.clients.comet import CometClient
 from app.clients.manychat import ManyChatClient
+from app.clients.telegram import TelegramClient
 from app.config import Settings
-from app.db import add_message, get_recent_messages
+from app.db import add_message, get_recent_messages, register_handoff_notification
 from app.schemas import ManyChatWebhookIn
 from app.services.followup_scheduler import schedule_followup_on_user_message
 
@@ -54,6 +56,99 @@ def load_system_prompt(path: str) -> str:
     return prompt
 
 
+def _extract_city(payload: ManyChatWebhookIn, history: list[dict[str, str]]) -> str:
+    if payload.city:
+        return payload.city.strip()
+
+    city_aliases = {
+        "будва": "Будва",
+        "budva": "Budva",
+        "подгорица": "Подгорица",
+        "podgorica": "Podgorica",
+    }
+    for msg in reversed(history):
+        content = (msg.get("content") or "").lower()
+        for alias, normalized in city_aliases.items():
+            if alias in content:
+                return normalized
+    return "не указано"
+
+
+def _extract_date(payload: ManyChatWebhookIn, history: list[dict[str, str]]) -> str:
+    if payload.date:
+        return payload.date.strip()
+
+    date_markers = [
+        "сегодня",
+        "завтра",
+        "послезавтра",
+        "понедельник",
+        "вторник",
+        "среда",
+        "четверг",
+        "пятница",
+        "суббота",
+        "воскресенье",
+        "today",
+        "tomorrow",
+        "next week",
+    ]
+    for msg in reversed(history):
+        content = (msg.get("content") or "").strip()
+        low = content.lower()
+        for marker in date_markers:
+            if marker in low:
+                return content
+    return "не указано"
+
+
+def _build_name(payload: ManyChatWebhookIn) -> str:
+    parts = [p.strip() for p in [payload.first_name, payload.last_name] if p and p.strip()]
+    if parts:
+        return " ".join(parts)
+    return "не указано"
+
+
+def _normalize_username(value: str | None) -> str:
+    if not value or not value.strip():
+        return "не указано"
+    username = value.strip()
+    if username.startswith("@"):
+        return username
+    return f"@{username}"
+
+
+def _is_admin_handoff_signal(handoff: bool, reply_text: str) -> bool:
+    if handoff:
+        return True
+    low = reply_text.lower()
+    markers = [
+        "передам информацию",
+        "передам мастеру",
+        "передам администратору",
+        "i will pass",
+        "i'll pass",
+    ]
+    return any(marker in low for marker in markers)
+
+
+def _build_telegram_message(
+    name: str,
+    username: str,
+    city: str,
+    date: str,
+    channel: str,
+) -> str:
+    return (
+        "Новый клиент готов записаться\n\n"
+        f"Имя: {name}\n"
+        f"Username: {username}\n"
+        f"Город: {city}\n"
+        f"Дата: {date}\n"
+        f"Соцсеть: {channel}"
+    )
+
+
 async def process_incoming_message(payload: ManyChatWebhookIn, settings: Settings) -> None:
     try:
         channel = payload.channel.strip().lower()
@@ -99,6 +194,28 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
             channel,
             flow_ns,
         )
+
+        if _is_admin_handoff_signal(handoff, reply_text):
+            dedupe_source = f"{channel}|{payload.last_input.strip().lower()}|{reply_text.strip().lower()}"
+            dedupe_key = hashlib.sha256(dedupe_source.encode("utf-8")).hexdigest()
+            if register_handoff_notification(settings.db_path, payload.contact_id, dedupe_key):
+                telegram = TelegramClient(settings)
+                if telegram.is_configured:
+                    conversation_for_extract = history + [{"role": "user", "content": payload.last_input}]
+                    name = _build_name(payload)
+                    username = _normalize_username(payload.username)
+                    city = _extract_city(payload, conversation_for_extract)
+                    date = _extract_date(payload, conversation_for_extract)
+                    telegram_text = _build_telegram_message(name, username, city, date, channel)
+                    try:
+                        await telegram.send_text(telegram_text)
+                        logger.info("telegram_notification_sent contact_id=%s", payload.contact_id)
+                    except Exception:
+                        logger.exception("telegram_notification_failed contact_id=%s", payload.contact_id)
+                else:
+                    logger.warning("telegram_notification_skipped_not_configured contact_id=%s", payload.contact_id)
+            else:
+                logger.info("telegram_notification_skipped_duplicate contact_id=%s", payload.contact_id)
 
         logger.info(
             "Processed message contact_id=%s channel=%s handoff=%s",

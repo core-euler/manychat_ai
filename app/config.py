@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     manychat_webhook_secret: str | None = Field(default=None, alias="MANYCHAT_WEBHOOK_SECRET")
     internal_api_secret: str | None = Field(default=None, alias="INTERNAL_API_SECRET")
+    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
+    telegram_admin_id: str | None = Field(default=None, alias="TELEGRAM_ADMIN_ID")
 
     system_prompt_path: str = Field(default="system_prompt.txt", alias="SYSTEM_PROMPT_PATH")
     followup_prompt_path: str = Field(default="followup_prompt.txt", alias="FOLLOWUP_PROMPT_PATH")

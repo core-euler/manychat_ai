@@ -30,6 +30,7 @@ Backend for ManyChat async AI replies using CometAPI.
    - `MANYCHAT_FOLLOWUP_FLOW_INSTAGRAM`
    - `MANYCHAT_FOLLOWUP_FLOW_FACEBOOK`
    - `MANYCHAT_FIELD_AI_FOLLOWUP` (default: `ai_followup_reply`)
+   - `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_ID` (optional admin notifications)
    - optionally `INTERNAL_API_SECRET` to protect `/manychat-callback`
 3. Put your production prompt into `system_prompt.txt`
 4. Put your follow-up prompt into `followup_prompt.txt`
