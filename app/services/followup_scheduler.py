@@ -26,7 +26,7 @@ FOLLOWUP_MAX_AGE = timedelta(days=14)
 FOLLOWUP_RETRY_DELAY = timedelta(minutes=15)
 FOLLOWUP_POLL_INTERVAL_SECONDS = 30
 FOLLOWUP_SENDING_STALE_AFTER = timedelta(minutes=10)
-SUPPORTED_CHANNELS = {"instagram", "facebook"}
+SUPPORTED_CHANNELS = {"instagram", "facebook", "whatsapp"}
 FOLLOWUP_HISTORY_LIMIT = 20
 HANDOFF_TAG = "[HANDOFF]"
 
@@ -194,6 +194,12 @@ async def process_due_followups(settings: Settings) -> None:
                 channel,
             )
             continue
+        logger.info(
+            "Follow-up flow selected contact_id=%s channel=%s flow_ns=%s",
+            contact_id,
+            channel,
+            flow_ns,
+        )
 
         try:
             followup_text = await _generate_followup_text(settings, contact_id, channel)

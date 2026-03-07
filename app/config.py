@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     manychat_api_token: str = Field(alias="MANYCHAT_API_TOKEN")
     manychat_reply_flow_instagram: str | None = Field(default=None, alias="MANYCHAT_REPLY_FLOW_INSTAGRAM")
     manychat_reply_flow_facebook: str | None = Field(default=None, alias="MANYCHAT_REPLY_FLOW_FACEBOOK")
+    manychat_reply_flow_whatsapp: str | None = Field(default=None, alias="MANYCHAT_REPLY_FLOW_WHATSAPP")
     manychat_followup_flow_instagram: str | None = Field(default=None, alias="MANYCHAT_FOLLOWUP_FLOW_INSTAGRAM")
     manychat_followup_flow_facebook: str | None = Field(default=None, alias="MANYCHAT_FOLLOWUP_FLOW_FACEBOOK")
+    manychat_followup_flow_whatsapp: str | None = Field(default=None, alias="MANYCHAT_FOLLOWUP_FLOW_WHATSAPP")
     # Backward-compatible fallback when channel-specific flow is not configured.
     manychat_send_flow_ns: str | None = Field(default=None, alias="MANYCHAT_SEND_FLOW_NS")
     manychat_field_ai_reply: str = Field(default="ai_reply", alias="MANYCHAT_FIELD_AI_REPLY")

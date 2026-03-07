@@ -77,6 +77,16 @@ def init_db(db_path: str) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS handoff_state (
+                contact_id TEXT PRIMARY KEY,
+                handoff_active INTEGER NOT NULL CHECK(handoff_active IN (0, 1)),
+                activated_at TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL
+            )
+            """
+        )
 
 
 def add_message(db_path: str, contact_id: str, role: str, content: str) -> None:
@@ -287,5 +297,38 @@ def register_handoff_notification(db_path: str, contact_id: str, dedupe_key: str
             VALUES (?, ?, ?)
             """,
             (contact_id, dedupe_key, utcnow_iso()),
+        )
+        return cur.rowcount == 1
+
+
+def is_handoff_active(db_path: str, contact_id: str) -> bool:
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT handoff_active
+            FROM handoff_state
+            WHERE contact_id = ?
+            """,
+            (contact_id,),
+        ).fetchone()
+    if row is None:
+        return False
+    return bool(row["handoff_active"])
+
+
+def activate_handoff(db_path: str, contact_id: str) -> bool:
+    now = utcnow_iso()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO handoff_state(contact_id, handoff_active, activated_at, updated_at)
+            VALUES (?, 1, ?, ?)
+            ON CONFLICT(contact_id) DO UPDATE SET
+                handoff_active = 1,
+                activated_at = COALESCE(handoff_state.activated_at, excluded.activated_at),
+                updated_at = excluded.updated_at
+            WHERE handoff_state.handoff_active = 0
+            """,
+            (contact_id, now, now),
         )
         return cur.rowcount == 1

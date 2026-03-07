@@ -8,7 +8,13 @@ from app.clients.comet import CometClient
 from app.clients.manychat import ManyChatClient
 from app.clients.telegram import TelegramClient
 from app.config import Settings
-from app.db import add_message, get_recent_messages, register_handoff_notification
+from app.db import (
+    activate_handoff,
+    add_message,
+    get_recent_messages,
+    is_handoff_active,
+    register_handoff_notification,
+)
 from app.schemas import ManyChatWebhookIn
 from app.services.followup_scheduler import schedule_followup_on_user_message
 
@@ -165,13 +171,35 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
         comet = CometClient(settings)
         llm_raw = await comet.complete(messages)
 
-        reply_text, handoff = parse_handoff(llm_raw)
+        reply_text, handoff_detected = parse_handoff(llm_raw)
         reply_text = trim_for_channel(reply_text, channel)
 
         add_message(settings.db_path, payload.contact_id, "assistant", reply_text)
 
+        handoff_active_before = is_handoff_active(settings.db_path, payload.contact_id)
+        handoff_to_write = False
+        handoff_active_after = handoff_active_before
+        if handoff_detected:
+            logger.info("handoff detected contact_id=%s", payload.contact_id)
+            if handoff_active_before:
+                logger.info("handoff already active contact_id=%s", payload.contact_id)
+            else:
+                if activate_handoff(settings.db_path, payload.contact_id):
+                    handoff_to_write = True
+                    handoff_active_after = True
+                    logger.info("handoff flag updated to true contact_id=%s", payload.contact_id)
+                else:
+                    handoff_active_after = True
+                    logger.info("handoff already active contact_id=%s", payload.contact_id)
+        else:
+            logger.info(
+                "handoff flag preserved contact_id=%s active=%s",
+                payload.contact_id,
+                handoff_active_before,
+            )
+
         manychat = ManyChatClient(settings)
-        await manychat.save_reply_and_handoff(payload.contact_id, reply_text, handoff)
+        await manychat.save_reply_and_handoff(payload.contact_id, reply_text, handoff_to_write)
         flow_ns = manychat.resolve_reply_flow(channel)
         if not flow_ns:
             logger.warning(
@@ -195,7 +223,7 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
             flow_ns,
         )
 
-        if _is_admin_handoff_signal(handoff, reply_text):
+        if _is_admin_handoff_signal(handoff_detected, reply_text):
             dedupe_source = f"{channel}|{payload.last_input.strip().lower()}|{reply_text.strip().lower()}"
             dedupe_key = hashlib.sha256(dedupe_source.encode("utf-8")).hexdigest()
             if register_handoff_notification(settings.db_path, payload.contact_id, dedupe_key):
@@ -218,10 +246,11 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
                 logger.info("telegram_notification_skipped_duplicate contact_id=%s", payload.contact_id)
 
         logger.info(
-            "Processed message contact_id=%s channel=%s handoff=%s",
+            "Processed message contact_id=%s channel=%s handoff_detected=%s handoff_active=%s",
             payload.contact_id,
             channel,
-            handoff,
+            handoff_detected,
+            handoff_active_after,
         )
     except Exception:
         logger.exception("Failed processing message for contact_id=%s", payload.contact_id)

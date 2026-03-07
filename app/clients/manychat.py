@@ -20,10 +20,12 @@ class ManyChatClient:
         self._flow_map = {
             "instagram": settings.manychat_reply_flow_instagram,
             "facebook": settings.manychat_reply_flow_facebook,
+            "whatsapp": settings.manychat_reply_flow_whatsapp,
         }
         self._followup_flow_map = {
             "instagram": settings.manychat_followup_flow_instagram,
             "facebook": settings.manychat_followup_flow_facebook,
+            "whatsapp": settings.manychat_followup_flow_whatsapp,
         }
         self._fallback_flow_ns = settings.manychat_send_flow_ns
         self._field_ai_reply = settings.manychat_field_ai_reply
@@ -94,7 +96,8 @@ class ManyChatClient:
 
     async def save_reply_and_handoff(self, subscriber_id: str, reply_text: str, handoff: bool) -> None:
         await self.set_custom_field(subscriber_id, self._field_ai_reply, reply_text)
-        await self.set_custom_field(subscriber_id, self._field_handoff, "true" if handoff else "false")
+        if handoff:
+            await self.set_custom_field(subscriber_id, self._field_handoff, "true")
 
     async def save_followup_reply(self, subscriber_id: str, followup_text: str) -> None:
         await self.set_custom_field(subscriber_id, self._field_ai_followup, followup_text)

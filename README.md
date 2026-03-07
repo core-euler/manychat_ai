@@ -27,8 +27,10 @@ Backend for ManyChat async AI replies using CometAPI.
    - `MANYCHAT_API_TOKEN`
    - `MANYCHAT_REPLY_FLOW_INSTAGRAM`
    - `MANYCHAT_REPLY_FLOW_FACEBOOK`
+   - `MANYCHAT_REPLY_FLOW_WHATSAPP`
    - `MANYCHAT_FOLLOWUP_FLOW_INSTAGRAM`
    - `MANYCHAT_FOLLOWUP_FLOW_FACEBOOK`
+   - `MANYCHAT_FOLLOWUP_FLOW_WHATSAPP`
    - `MANYCHAT_FIELD_AI_FOLLOWUP` (default: `ai_followup_reply`)
    - `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_ID` (optional admin notifications)
    - optionally `INTERNAL_API_SECRET` to protect `/manychat-callback`
