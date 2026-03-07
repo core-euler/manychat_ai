@@ -8,6 +8,7 @@ from app.clients.manychat import ManyChatClient
 from app.config import Settings
 from app.db import add_message, get_recent_messages
 from app.schemas import ManyChatWebhookIn
+from app.services.followup_scheduler import schedule_followup_on_user_message
 
 logger = logging.getLogger(__name__)
 HANDOFF_TAG = "[HANDOFF]"
@@ -57,6 +58,7 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
     try:
         channel = payload.channel.strip().lower()
         logger.info("Incoming message contact_id=%s channel=%s", payload.contact_id, channel)
+        schedule_followup_on_user_message(settings, payload.contact_id, channel)
 
         history = get_recent_messages(settings.db_path, payload.contact_id, limit=30)
         add_message(settings.db_path, payload.contact_id, "user", payload.last_input)

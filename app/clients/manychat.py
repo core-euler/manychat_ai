@@ -13,8 +13,13 @@ class ManyChatClient:
             "instagram": settings.manychat_reply_flow_instagram,
             "facebook": settings.manychat_reply_flow_facebook,
         }
+        self._followup_flow_map = {
+            "instagram": settings.manychat_followup_flow_instagram,
+            "facebook": settings.manychat_followup_flow_facebook,
+        }
         self._fallback_flow_ns = settings.manychat_send_flow_ns
         self._field_ai_reply = settings.manychat_field_ai_reply
+        self._field_ai_followup = settings.manychat_field_ai_followup
         self._field_handoff = settings.manychat_field_handoff
 
     @property
@@ -42,6 +47,9 @@ class ManyChatClient:
         await self.set_custom_field(subscriber_id, self._field_ai_reply, reply_text)
         await self.set_custom_field(subscriber_id, self._field_handoff, "true" if handoff else "false")
 
+    async def save_followup_reply(self, subscriber_id: str, followup_text: str) -> None:
+        await self.set_custom_field(subscriber_id, self._field_ai_followup, followup_text)
+
     def resolve_reply_flow(self, channel: str) -> str | None:
         normalized = channel.strip().lower()
         if normalized not in self._flow_map:
@@ -52,6 +60,10 @@ class ManyChatClient:
             return flow_ns
 
         return self._fallback_flow_ns
+
+    def resolve_followup_flow(self, channel: str) -> str | None:
+        normalized = channel.strip().lower()
+        return self._followup_flow_map.get(normalized)
 
     async def send_flow(self, subscriber_id: str, flow_ns: str) -> None:
         payload = {

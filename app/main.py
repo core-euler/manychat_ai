@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
@@ -14,6 +15,7 @@ from app.schemas import (
     WebhookAckResponse,
 )
 from app.services.chat_processor import process_incoming_message
+from app.services.followup_scheduler import run_followup_worker
 
 settings = get_settings()
 
@@ -26,8 +28,20 @@ app = FastAPI(title="Tattoo44 AI Backend", version="1.0.0")
 
 
 @app.on_event("startup")
-def startup_event() -> None:
+async def startup_event() -> None:
     init_db(settings.db_path)
+    app.state.followup_worker_task = asyncio.create_task(run_followup_worker(settings))
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    task = getattr(app.state, "followup_worker_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 @app.get("/health", response_model=HealthResponse)
