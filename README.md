@@ -25,7 +25,8 @@ Backend for ManyChat async AI replies using CometAPI.
    - `COMET_API_KEY`
    - `COMET_MODEL`
    - `MANYCHAT_API_TOKEN`
-   - `MANYCHAT_SEND_FLOW_NS`
+   - `MANYCHAT_REPLY_FLOW_INSTAGRAM`
+   - `MANYCHAT_REPLY_FLOW_FACEBOOK`
    - optionally `INTERNAL_API_SECRET` to protect `/manychat-callback`
 3. Put your production prompt into `system_prompt.txt`
 

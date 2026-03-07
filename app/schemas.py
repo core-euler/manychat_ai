@@ -1,11 +1,9 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
 
 class ManyChatWebhookIn(BaseModel):
     contact_id: str = Field(min_length=1)
-    channel: Literal["instagram", "facebook", "whatsapp"]
+    channel: str = Field(min_length=1)
     first_name: str | None = None
     last_name: str | None = None
     last_input: str = Field(min_length=1)

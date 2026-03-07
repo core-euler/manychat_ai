@@ -55,6 +55,9 @@ def load_system_prompt(path: str) -> str:
 
 async def process_incoming_message(payload: ManyChatWebhookIn, settings: Settings) -> None:
     try:
+        channel = payload.channel.strip().lower()
+        logger.info("Incoming message contact_id=%s channel=%s", payload.contact_id, channel)
+
         history = get_recent_messages(settings.db_path, payload.contact_id, limit=30)
         add_message(settings.db_path, payload.contact_id, "user", payload.last_input)
 
@@ -66,18 +69,39 @@ async def process_incoming_message(payload: ManyChatWebhookIn, settings: Setting
         llm_raw = await comet.complete(messages)
 
         reply_text, handoff = parse_handoff(llm_raw)
-        reply_text = trim_for_channel(reply_text, payload.channel)
+        reply_text = trim_for_channel(reply_text, channel)
 
         add_message(settings.db_path, payload.contact_id, "assistant", reply_text)
 
         manychat = ManyChatClient(settings)
         await manychat.save_reply_and_handoff(payload.contact_id, reply_text, handoff)
-        await manychat.send_flow(payload.contact_id)
+        flow_ns = manychat.resolve_reply_flow(channel)
+        if not flow_ns:
+            logger.warning(
+                "Unsupported or unconfigured channel; sendFlow skipped contact_id=%s channel=%s",
+                payload.contact_id,
+                channel,
+            )
+            return
+
+        logger.info(
+            "Reply flow selected contact_id=%s channel=%s flow_ns=%s",
+            payload.contact_id,
+            channel,
+            flow_ns,
+        )
+        await manychat.send_flow(payload.contact_id, flow_ns)
+        logger.info(
+            "sendFlow succeeded contact_id=%s channel=%s flow_ns=%s",
+            payload.contact_id,
+            channel,
+            flow_ns,
+        )
 
         logger.info(
             "Processed message contact_id=%s channel=%s handoff=%s",
             payload.contact_id,
-            payload.channel,
+            channel,
             handoff,
         )
     except Exception:

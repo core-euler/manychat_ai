@@ -60,5 +60,7 @@ async def manychat_callback(
 
     client = ManyChatClient(settings)
     await client.save_reply_and_handoff(payload.contact_id, payload.reply_text, payload.handoff)
-    await client.send_flow(payload.contact_id)
+    if not settings.manychat_send_flow_ns:
+        raise HTTPException(status_code=400, detail="MANYCHAT_SEND_FLOW_NS is required for /manychat-callback")
+    await client.send_flow(payload.contact_id, settings.manychat_send_flow_ns)
     return WebhookAckResponse(status="ok")

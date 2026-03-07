@@ -19,7 +19,10 @@ class Settings(BaseSettings):
 
     manychat_api_url: str = Field(default="https://api.manychat.com", alias="MANYCHAT_API_URL")
     manychat_api_token: str = Field(alias="MANYCHAT_API_TOKEN")
-    manychat_send_flow_ns: str = Field(alias="MANYCHAT_SEND_FLOW_NS")
+    manychat_reply_flow_instagram: str | None = Field(default=None, alias="MANYCHAT_REPLY_FLOW_INSTAGRAM")
+    manychat_reply_flow_facebook: str | None = Field(default=None, alias="MANYCHAT_REPLY_FLOW_FACEBOOK")
+    # Backward-compatible fallback when channel-specific flow is not configured.
+    manychat_send_flow_ns: str | None = Field(default=None, alias="MANYCHAT_SEND_FLOW_NS")
     manychat_field_ai_reply: str = Field(default="ai_reply", alias="MANYCHAT_FIELD_AI_REPLY")
     manychat_field_handoff: str = Field(default="handoff_flag", alias="MANYCHAT_FIELD_HANDOFF")
 
