@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 import httpx
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
+
+RETRY_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 1.0
 
 
 class ManyChatClient:
@@ -29,19 +37,60 @@ class ManyChatClient:
             "Content-Type": "application/json",
         }
 
+    async def _post_with_retry(self, endpoint: str, payload: dict) -> None:
+        url = f"{self._base_url}{endpoint}"
+
+        for attempt in range(1, RETRY_ATTEMPTS + 1):
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(
+                        url,
+                        headers=self._headers,
+                        json=payload,
+                    )
+                if resp.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        f"ManyChat server error {resp.status_code}",
+                        request=resp.request,
+                        response=resp,
+                    )
+                resp.raise_for_status()
+                return
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.RemoteProtocolError) as exc:
+                if attempt >= RETRY_ATTEMPTS:
+                    raise
+                delay = RETRY_BASE_DELAY_SECONDS * attempt
+                logger.warning(
+                    "ManyChat network error, retrying attempt=%s/%s endpoint=%s delay=%.1fs error=%s",
+                    attempt,
+                    RETRY_ATTEMPTS,
+                    endpoint,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                if status_code is None or status_code < 500 or attempt >= RETRY_ATTEMPTS:
+                    raise
+                delay = RETRY_BASE_DELAY_SECONDS * attempt
+                logger.warning(
+                    "ManyChat 5xx error, retrying attempt=%s/%s endpoint=%s status=%s delay=%.1fs",
+                    attempt,
+                    RETRY_ATTEMPTS,
+                    endpoint,
+                    status_code,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
     async def set_custom_field(self, subscriber_id: str, field_name: str, field_value: str) -> None:
         payload = {
             "subscriber_id": subscriber_id,
             "field_name": field_name,
             "field_value": field_value,
         }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{self._base_url}/fb/subscriber/setCustomFieldByName",
-                headers=self._headers,
-                json=payload,
-            )
-            resp.raise_for_status()
+        await self._post_with_retry("/fb/subscriber/setCustomFieldByName", payload)
 
     async def save_reply_and_handoff(self, subscriber_id: str, reply_text: str, handoff: bool) -> None:
         await self.set_custom_field(subscriber_id, self._field_ai_reply, reply_text)
@@ -70,10 +119,4 @@ class ManyChatClient:
             "subscriber_id": subscriber_id,
             "flow_ns": flow_ns,
         }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{self._base_url}/fb/sending/sendFlow",
-                headers=self._headers,
-                json=payload,
-            )
-            resp.raise_for_status()
+        await self._post_with_retry("/fb/sending/sendFlow", payload)
